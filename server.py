@@ -849,6 +849,36 @@ async def boss_debug_page() -> dict:
 
 
 @mcp.tool()
+async def boss_diagnose() -> dict:
+    """浏览器环境自检：遇到页面打不开、标签页被清空、登录失效等问题时先调用本工具。
+
+    自动检测并给出修复指引：
+    - Chrome 首次运行引导（FRE）劫持标签页（chrome://intro 重生、新标签页变 about:blank）
+    - BOSS 反自动化风控清空页面（tab wipe，风控有累积效应，连续失败须停手冷却）
+    - 登录态判定（注意 __c/__g/__l cookie 不代表登录成功）
+    - 系统代理未配置 NO_PROXY 导致 CDP 连不上 localhost
+
+    详细背景见仓库 docs/TROUBLESHOOTING.md。
+
+    Returns:
+        ok（是否有 error 级问题）+ findings 列表（code/level/detail/fix）
+    """
+    browser = await get_browser()
+    diagnose = getattr(browser, "diagnose_environment", None)
+    if diagnose is None:
+        return {
+            "ok": None,
+            "findings": [{
+                "code": "STALE_INSTANCE", "level": "warning",
+                "detail": "当前浏览器实例是热重载前创建的旧实例，缺少 diagnose_environment 方法",
+                "fix": "重启 MCP server 进程（或重启 DSH 会话）后再调用；"
+                       "或直接查阅仓库 docs/TROUBLESHOOTING.md 手工排查",
+            }],
+        }
+    return await diagnose()
+
+
+@mcp.tool()
 async def boss_reload() -> dict:
     """热重载所有模块代码，无需重启 server。
 
